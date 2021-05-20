@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8" />
+    <title>DNSServer-开源DNS服务器</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1, maximum-scale=1"
+    />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <link rel="stylesheet" href="https://amis.schoolwow.cn/sdk.css" />
+    <!-- 从 1.1.0 开始 sdk.css 将不支持 IE 11，如果要支持 IE11 请引用这个 css，并把前面那个删了 -->
+    <!-- <link rel="stylesheet" href="sdk-ie11.css" /> -->
+    <!-- 不过 amis 开发团队几乎没测试过 IE 11 下的效果，所以可能有细节功能用不了，如果发现请报 issue -->
+    <style>
+        html,
+        body,
+        .app-wrapper {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+    </style>
+</head>
+<body>
+<div id="root" class="app-wrapper"></div>
+<script src="https://amis.schoolwow.cn/sdk.js"></script>
+<script src="lib/loadjs.min.js"></script>
+<script>
+    loadjs([
+        '/page/dictionary.js',
+        '/page/dnsRecursionServer.js',
+        '/page/dnsRecord.js',
+        '/page/dnsErrorDatagram.js',
+        '/page/dnsRequestRecord.js',
+        '/page/dnsResponseRecord.js',
+    ], {
+        success: function() {
+            let amisJSON = {
+                "type": "app",
+                "brandName": "DNSServer",
+                "pages": [
+                    {
+                        "label": "",
+                        "children": [
+                            {
+                                "label": "字典表",
+                                "url": "dictionary",
+                                "schema": dictionary,
+                                "isDefaultPage": true
+                            },
+                            {
+                                "label": "DNS递归服务器",
+                                "url": "dnsRecursionServer",
+                                "schema": dnsRecursionServer,
+                            },
+                            {
+                                "label": "DNS记录",
+                                "url": "dnsRecord",
+                                "schema": dnsRecord,
+                            },
+                            {
+                                "label": "DNS错误报文",
+                                "url": "dnsErrorDatagram",
+                                "schema": dnsErrorDatagram,
+                            },
+                            {
+                                "label": "DNS请求记录",
+                                "url": "dnsRequestRecord",
+                                "schema": dnsRequestRecord,
+                            },
+                            {
+                                "label": "DNS响应报文",
+                                "url": "dnsResponseRecord",
+                                "schema": dnsResponseRecord,
+                            },
+                        ]
+                    },
+                ]
+            };
+
+            let amis = amisRequire('amis/embed');
+            const match = amisRequire('path-to-regexp').match;
+            let amisScoped = amis.embed(
+                '#root',
+                amisJSON,
+                {},
+                {
+                    watchRouteChange: fn => {
+                        window.addEventListener('hashchange', fn);
+                        return () => {
+                            window.removeEventListener('hashchange', fn);
+                        };
+                    },
+                    jumpTo: to => {
+                        location.hash = to;
+                    },
+                    isCurrentUrl: (to, ctx) => {
+                        if (!to) {
+                            return false;
+                        }
+                        const pathname = location.hash ? location.hash.substring(1) : '/';
+                        const link = normalizeLink(to, {
+                            ...location,
+                            pathname,
+                            hash: ''
+                        });
+
+                        if (!~link.indexOf('http') && ~link.indexOf(':')) {
+                            let strict = ctx && ctx.strict;
+                            return match(link, {
+                                decode: decodeURIComponent,
+                                strict: typeof strict !== 'undefined' ? strict : true
+                            })(pathname);
+                        }
+
+                        return pathname === link;
+                    },
+                    theme: 'default'
+                }
+            );
+
+            function normalizeLink(to, location = window.location) {
+                to = to || '';
+
+                if (to && to[0] === '#') {
+                    to = location.pathname + location.search + to;
+                } else if (to && to[0] === '?') {
+                    to = location.pathname + to;
+                }
+
+                const idx = to.indexOf('?');
+                const idx2 = to.indexOf('#');
+                let pathname = ~idx
+                    ? to.substring(0, idx)
+                    : ~idx2
+                        ? to.substring(0, idx2)
+                        : to;
+                let search = ~idx ? to.substring(idx, ~idx2 ? idx2 : undefined) : '';
+                let hash = ~idx2 ? to.substring(idx2) : location.hash;
+
+                if (!pathname) {
+                    pathname = location.pathname;
+                } else if (pathname[0] != '/' && !/^https?\:\/\//.test(pathname)) {
+                    let relativeBase = location.pathname;
+                    const paths = relativeBase.split('/');
+                    paths.pop();
+                    let m;
+                    while ((m = /^\.\.?\//.exec(pathname))) {
+                        if (m[0] === '../') {
+                            paths.pop();
+                        }
+                        pathname = pathname.substring(m[0].length);
+                    }
+                    pathname = paths.concat(pathname).join('/');
+                }
+
+                return pathname + search + hash;
+            }
+        }
+    });
+</script>
+</body>
+</html>
